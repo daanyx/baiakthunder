@@ -1,4 +1,4 @@
-name: 6Build Release x64 - Robust Alternative  
+name: Build Release x64 - Robust Alternative  
   
 on:  
   push:  
@@ -26,6 +26,32 @@ jobs:
           vcpkg-robust-${{ runner.os }}-x64-  
           vcpkg-robust-${{ runner.os }}-  
       
+    - name: Cache vcpkg downloads  
+      uses: actions/cache@v4  
+      with:  
+        path: C:\vcpkg\downloads  
+        key: vcpkg-downloads-${{ runner.os }}-${{ github.run_id }}  
+        restore-keys: |  
+          vcpkg-downloads-${{ runner.os }}-  
+      
+    - name: Cache vcpkg buildtrees  
+      uses: actions/cache@v4  
+      with:  
+        path: C:\vcpkg\buildtrees  
+        key: vcpkg-buildtrees-${{ runner.os }}-x64-${{ github.sha }}  
+        restore-keys: |  
+          vcpkg-buildtrees-${{ runner.os }}-x64-  
+      
+    - name: Cache MSBuild outputs  
+      uses: actions/cache@v4  
+      with:  
+        path: |  
+          vc14/x64/Release  
+          vc14/.vs  
+        key: msbuild-${{ runner.os }}-${{ hashFiles('vc14/**/*.vcxproj', 'vc14/**/*.props', 'src/**/*.cpp', 'src/**/*.h') }}  
+        restore-keys: |  
+          msbuild-${{ runner.os }}-  
+      
     - name: Setup vcpkg with specific commit  
       run: |  
         git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
@@ -35,7 +61,7 @@ jobs:
         .\bootstrap-vcpkg.bat  
         .\vcpkg integrate install  
       
-    - name: Install dependencies with alternative Crypto++ strategy  
+    - name: Install dependencies with corrected fallback strategy  
       run: |  
         # Instalar dependências principais primeiro  
         C:\vcpkg\vcpkg install pugixml:x64-windows  
@@ -52,24 +78,61 @@ jobs:
           
         # Estratégia 1: Tentar versão HEAD do Crypto++  
         Write-Host "Tentando Crypto++ HEAD version..."  
-        C:\vcpkg\vcpkg install cryptopp:x64-windows --head --no-binarycaching  
-          
-        if (-not (Test-Path "C:\vcpkg\installed\x64-windows\include\cryptopp")) {  
-          Write-Host "Estratégia 1 falhou, tentando estratégia 2..."  
-            
-          # Estratégia 2: Usar versão específica mais antiga  
-          C:\vcpkg\vcpkg remove cryptopp:x64-windows --recurse 2>$null  
-          git checkout 2023.08.09  
-          .\bootstrap-vcpkg.bat  
-          .\vcpkg integrate install  
-          C:\vcpkg\vcpkg install cryptopp:x64-windows --no-binarycaching  
+        $cryptoSuccess = $false  
+        try {  
+          C:\vcpkg\vcpkg install cryptopp:x64-windows --head --no-binarycaching  
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\cryptopp") {  
+            $cryptoSuccess = $true  
+            Write-Host "✓ Crypto++ HEAD instalado com sucesso"  
+          }  
+        }  
+        catch {  
+          Write-Host "Estratégia 1 falhou: $($_.Exception.Message)"  
         }  
           
-        # Verificar instalação  
+        if (-not $cryptoSuccess) {  
+          Write-Host "Estratégia 1 falhou, tentando estratégia 2..."  
+            
+          # Estratégia 2: Usar commit mais antigo do vcpkg  
+          cd C:\vcpkg  
+          git fetch --tags  
+          git checkout 2023.04.15  # Usar commit conhecido que existe  
+          .\bootstrap-vcpkg.bat  
+          .\vcpkg integrate install  
+            
+          try {  
+            C:\vcpkg\vcpkg remove cryptopp:x64-windows --recurse 2>$null  
+            C:\vcpkg\vcpkg install cryptopp:x64-windows --no-binarycaching  
+            if (Test-Path "C:\vcpkg\installed\x64-windows\include\cryptopp") {  
+              $cryptoSuccess = $true  
+              Write-Host "✓ Crypto++ com vcpkg antigo instalado com sucesso"  
+            }  
+          }  
+          catch {  
+            Write-Host "Estratégia 2 também falhou: $($_.Exception.Message)"  
+          }  
+        }  
+          
+        # Verificar resultado final  
         if (Test-Path "C:\vcpkg\installed\x64-windows\include\cryptopp") {  
           Write-Host "✓ Crypto++ headers encontrados"  
         } else {  
-          Write-Host "✗ Crypto++ headers NÃO encontrados - continuando sem Crypto++"  
+          Write-Host "⚠ Crypto++ headers NÃO encontrados - tentando continuar sem pkgconfig"  
+        }  
+          
+        # Verificar outras dependências críticas  
+        if (Test-Path "C:\vcpkg\installed\x64-windows\include\pugixml.hpp") {  
+          Write-Host "✓ PugiXML header encontrado"  
+        } else {  
+          Write-Host "✗ PugiXML header NÃO encontrado"  
+          exit 1  
+        }  
+          
+        if (Test-Path "C:\vcpkg\installed\x64-windows\include\fmt") {  
+          Write-Host "✓ fmt headers encontrados"  
+        } else {  
+          Write-Host "✗ fmt headers NÃO encontrados"  
+          exit 1  
         }  
       
     - name: Update project configuration  
@@ -85,37 +148,50 @@ jobs:
         # Estratégia 1: Build normal  
         $buildSuccess = $false  
         try {  
+          Write-Host "Tentando build padrão..."  
           msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg /m /v:minimal  
-          $buildSuccess = $true  
-          Write-Host "✓ Build bem-sucedido com configuração padrão"  
+          if (Test-Path "vc14\x64\Release\theforgottenserver-x64.exe") {  
+            $buildSuccess = $true  
+            Write-Host "✓ Build bem-sucedido com configuração padrão"  
+          }  
         }  
         catch {  
-          Write-Host "Build padrão falhou, tentando sem otimizações..."  
+          Write-Host "Build padrão falhou: $($_.Exception.Message)"  
         }  
           
         if (-not $buildSuccess) {  
+          Write-Host "Build padrão falhou, tentando sem otimizações..."  
           # Estratégia 2: Desabilitar otimizações que causam conflito  
           try {  
             msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg /p:WholeProgramOptimization=false /p:LinkTimeCodeGeneration=false /m  
-            $buildSuccess = $true  
-            Write-Host "✓ Build bem-sucedido sem otimizações"  
+            if (Test-Path "vc14\x64\Release\theforgottenserver-x64.exe") {  
+              $buildSuccess = $true  
+              Write-Host "✓ Build bem-sucedido sem otimizações"  
+            }  
           }  
           catch {  
-            Write-Host "Build sem otimizações falhou, tentando com runtime estático..."  
+            Write-Host "Build sem otimizações falhou: $($_.Exception.Message)"  
           }  
         }  
           
         if (-not $buildSuccess) {  
+          Write-Host "Build sem otimizações falhou, tentando com runtime estático..."  
           # Estratégia 3: Usar runtime library estático  
           try {  
             msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg /p:RuntimeLibrary=MultiThreaded /m  
-            $buildSuccess = $true  
-            Write-Host "✓ Build bem-sucedido com runtime estático"  
+            if (Test-Path "vc14\x64\Release\theforgottenserver-x64.exe") {  
+              $buildSuccess = $true  
+              Write-Host "✓ Build bem-sucedido com runtime estático"  
+            }  
           }  
           catch {  
-            Write-Host "Todas as estratégias de build falharam"  
-            exit 1  
+            Write-Host "Build com runtime estático falhou: $($_.Exception.Message)"  
           }  
+        }  
+          
+        if (-not $buildSuccess) {  
+          Write-Host "✗ Todas as estratégias de build falharam"  
+          exit 1  
         }  
       
     - name: Verify and collect build output  
@@ -128,7 +204,12 @@ jobs:
             
           # Verificar dependências do executável  
           Write-Host "Verificando dependências..."  
-          dumpbin /dependents "vc14\x64\Release\theforgottenserver-x64.exe" | Select-String "\.dll"  
+          try {  
+            dumpbin /dependents "vc14\x64\Release\theforgottenserver-x64.exe" | Select-String "\.dll"  
+          }  
+          catch {  
+            Write-Host "Não foi possível verificar dependências com dumpbin"  
+          }  
         } else {  
           Write-Host "✗ Executável não foi gerado"  
           exit 1  
@@ -143,8 +224,9 @@ jobs:
           
         # Coletar informações de diagnóstico  
         echo "Build Strategy Used: Multiple fallback strategies" > artifacts\build-info.txt  
-        echo "vcpkg Version: 2024.01.12 with fallbacks" >> artifacts\build-info.txt  
+        echo "vcpkg Version: 2024.01.12 with fallbacks to 2023.04.15" >> artifacts\build-info.txt  
         echo "Build Date: $(Get-Date)" >> artifacts\build-info.txt  
+        echo "Crypto++ Status: $(if (Test-Path 'C:\vcpkg\installed\x64-windows\include\cryptopp') { 'Installed' } else { 'Failed' })" >> artifacts\build-info.txt  
           
         Write-Host "Artefatos coletados:"  
         Get-ChildItem artifacts\ | ForEach-Object { Write-Host "- $($_.Name) ($($_.Length) bytes)" }  
