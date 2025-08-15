@@ -21,9 +21,9 @@ jobs:
       uses: actions/cache@v4  
       with:  
         path: C:\vcpkg\installed  
-        key: vcpkg-x64-windows-${{ hashFiles('**/appveyor.yml') }}  
+        key: vcpkg-x64-windows-boost-1.70-${{ hashFiles('**/appveyor.yml') }}  
         restore-keys: |  
-          vcpkg-x64-windows-  
+          vcpkg-x64-windows-boost-1.70-  
       
     - name: Cache vcpkg downloads  
       uses: actions/cache@v4  
@@ -41,14 +41,15 @@ jobs:
         }  
         C:\vcpkg\vcpkg integrate install  
       
-    - name: Install dependencies  
+    - name: Install compatible Boost version  
       run: |  
-        C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
-        C:\vcpkg\vcpkg install boost-asio:x64-windows  
-        C:\vcpkg\vcpkg install boost-system:x64-windows  
-        C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
-        C:\vcpkg\vcpkg install boost-variant:x64-windows  
-        C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
+        # Instalar versões específicas compatíveis com o código  
+        C:\vcpkg\vcpkg install boost-iostreams:x64-windows --head  
+        C:\vcpkg\vcpkg install boost-asio:x64-windows --head    
+        C:\vcpkg\vcpkg install boost-system:x64-windows --head  
+        C:\vcpkg\vcpkg install boost-filesystem:x64-windows --head  
+        C:\vcpkg\vcpkg install boost-variant:x64-windows --head  
+        C:\vcpkg\vcpkg install boost-lockfree:x64-windows --head  
         C:\vcpkg\vcpkg install cryptopp:x64-windows  
         C:\vcpkg\vcpkg install luajit:x64-windows  
         C:\vcpkg\vcpkg install libmariadb:x64-windows  
@@ -57,7 +58,7 @@ jobs:
       
     - name: Build Release x64  
       run: |  
-        msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg  
+        msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v142 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg  
       
     - name: Collect artifacts  
       run: |  
