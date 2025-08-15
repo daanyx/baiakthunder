@@ -12,13 +12,13 @@ jobs:
       
     steps:  
     - name: Checkout code  
-      uses: actions/checkout@v3  
+      uses: actions/checkout@v4  
       
     - name: Setup MSBuild  
       uses: microsoft/setup-msbuild@v1  
       
     - name: Cache vcpkg  
-      uses: actions/cache@v3  
+      uses: actions/cache@v4  
       with:  
         path: C:\vcpkg\installed  
         key: vcpkg-x64-windows-${{ hashFiles('**/appveyor.yml') }}  
@@ -26,7 +26,7 @@ jobs:
           vcpkg-x64-windows-  
       
     - name: Cache vcpkg downloads  
-      uses: actions/cache@v3  
+      uses: actions/cache@v4  
       with:  
         path: C:\vcpkg\downloads  
         key: vcpkg-downloads-${{ hashFiles('**/appveyor.yml') }}  
@@ -56,7 +56,7 @@ jobs:
         C:\vcpkg\vcpkg install mpir:x64-windows  
       
     - name: Cache MSBuild  
-      uses: actions/cache@v3  
+      uses: actions/cache@v4  
       with:  
         path: |  
           vc14/x64/Release  
@@ -76,7 +76,7 @@ jobs:
         copy vc14\x64\Release\*.dll artifacts\  
       
     - name: Upload Release x64  
-      uses: actions/upload-artifact@v3  
+      uses: actions/upload-artifact@v4  
       with:  
         name: baiak-thunder-release-x64  
         path: artifacts\*
