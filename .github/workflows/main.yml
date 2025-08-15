@@ -38,10 +38,8 @@ jobs:
       run: |  
         msbuild vc14/theforgottenserver.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=x64  
       
-    - name: Upload artifacts (EXE + DLLs)  
+    - name: Upload artifacts  
       uses: actions/upload-artifact@v3  
       with:  
         name: theforgottenserver-${{ matrix.configuration }}-x64  
-        path: |  
-          vc14/**/*.exe  
-          vc14/**/*.dll
+        path: vc14/**/*.exe
