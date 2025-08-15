@@ -21,17 +21,9 @@ jobs:
       uses: actions/cache@v4  
       with:  
         path: C:\vcpkg\installed  
-        key: vcpkg-x64-windows-boost-1.70-${{ hashFiles('**/appveyor.yml') }}  
+        key: vcpkg-x64-windows-${{ hashFiles('**/appveyor.yml') }}  
         restore-keys: |  
-          vcpkg-x64-windows-boost-1.70-  
-      
-    - name: Cache vcpkg downloads  
-      uses: actions/cache@v4  
-      with:  
-        path: C:\vcpkg\downloads  
-        key: vcpkg-downloads-${{ hashFiles('**/appveyor.yml') }}  
-        restore-keys: |  
-          vcpkg-downloads-  
+          vcpkg-x64-windows-  
       
     - name: Setup vcpkg  
       run: |  
@@ -41,20 +33,27 @@ jobs:
         }  
         C:\vcpkg\vcpkg integrate install  
       
-    - name: Install compatible Boost version  
+    - name: Install dependencies with verification  
       run: |  
-        # Instalar versões específicas compatíveis com o código  
-        C:\vcpkg\vcpkg install boost-iostreams:x64-windows --head  
-        C:\vcpkg\vcpkg install boost-asio:x64-windows --head    
-        C:\vcpkg\vcpkg install boost-system:x64-windows --head  
-        C:\vcpkg\vcpkg install boost-filesystem:x64-windows --head  
-        C:\vcpkg\vcpkg install boost-variant:x64-windows --head  
-        C:\vcpkg\vcpkg install boost-lockfree:x64-windows --head  
+        C:\vcpkg\vcpkg install boost-asio:x64-windows  
+        C:\vcpkg\vcpkg install boost-system:x64-windows  
+        C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
+        C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
+        C:\vcpkg\vcpkg install boost-variant:x64-windows  
+        C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
         C:\vcpkg\vcpkg install cryptopp:x64-windows  
         C:\vcpkg\vcpkg install luajit:x64-windows  
         C:\vcpkg\vcpkg install libmariadb:x64-windows  
         C:\vcpkg\vcpkg install pugixml:x64-windows  
         C:\vcpkg\vcpkg install mpir:x64-windows  
+          
+        # Verificar se os headers foram instalados  
+        if (Test-Path "C:\vcpkg\installed\x64-windows\include\boost\asio.hpp") {  
+          Write-Host "✓ Boost ASIO headers encontrados"  
+        } else {  
+          Write-Host "✗ Boost ASIO headers NÃO encontrados"  
+          exit 1  
+        }  
       
     - name: Build Release x64  
       run: |  
