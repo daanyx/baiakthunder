@@ -1,4 +1,4 @@
-name: XYZBuild Release x64 - Visual Studio v141  
+name: Build Release x64 - Visual Studio v141  
   
 on:  
   push:  
@@ -16,6 +16,13 @@ jobs:
       
     - name: Setup MSBuild  
       uses: microsoft/setup-msbuild@v2  
+      
+    - name: Install Visual Studio 2017 Build Tools  
+      run: |  
+        # Download and install VS2017 Build Tools  
+        Invoke-WebRequest -Uri "https://aka.ms/vs/15/release/vs_buildtools.exe" -OutFile "vs_buildtools.exe"  
+        Start-Process -FilePath "vs_buildtools.exe" -ArgumentList "--quiet", "--wait", "--add", "Microsoft.VisualStudio.Workload.VCTools", "--add", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "--add", "Microsoft.VisualStudio.Component.Windows10SDK.17763" -Wait  
+        Write-Host "✓ Visual Studio 2017 Build Tools instalado"  
       
     - name: Cache vcpkg installed packages  
       uses: actions/cache@v4  
