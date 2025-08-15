@@ -1,4 +1,4 @@
-name: XXXBuild Release x64 - Visual Studio Native  
+name: Build Release x64 - Visual Studio Native  
   
 on:  
   push:  
@@ -60,7 +60,7 @@ jobs:
         .\bootstrap-vcpkg.bat  
         .\vcpkg integrate install  
       
-    - name: Install dependencies with Crypto++ rebuild  
+    - name: Install dependencies with specific Crypto++ version  
       run: |  
         # Instalar dependências principais primeiro  
         C:\vcpkg\vcpkg install pugixml:x64-windows  
@@ -75,7 +75,13 @@ jobs:
         C:\vcpkg\vcpkg install libmariadb:x64-windows  
         C:\vcpkg\vcpkg install mpir:x64-windows  
           
-        # Remover qualquer versão existente do Crypto++ e forçar recompilação  
+        # Tentar versão mais antiga do vcpkg para Crypto++  
+        cd C:\vcpkg  
+        git checkout 2023.04.15  
+        .\bootstrap-vcpkg.bat  
+        .\vcpkg integrate install  
+          
+        # Remover e reinstalar Crypto++ com versão mais antiga  
         C:\vcpkg\vcpkg remove cryptopp:x64-windows --recurse 2>$null || echo "Crypto++ não estava instalado"  
         C:\vcpkg\vcpkg install cryptopp:x64-windows --no-binarycaching  
           
