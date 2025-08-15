@@ -1,0 +1,47 @@
+name: Build Windows x64  
+  
+on:  
+  push:  
+    branches: [ main, master ]  
+  pull_request:  
+    branches: [ main, master ]  
+  
+jobs:  
+  build-windows:  
+    runs-on: windows-latest  
+      
+    strategy:  
+      matrix:  
+        configuration: [Debug, Release]  
+          
+    steps:  
+    - uses: actions/checkout@v3  
+      
+    - name: Setup vcpkg  
+      uses: microsoft/setup-msbuild@v1  
+        
+    - name: Install dependencies with vcpkg  
+      run: |  
+        vcpkg install boost-iostreams:x64-windows  
+        vcpkg install boost-asio:x64-windows  
+        vcpkg install boost-system:x64-windows  
+        vcpkg install boost-filesystem:x64-windows  
+        vcpkg install boost-variant:x64-windows  
+        vcpkg install boost-lockfree:x64-windows  
+        vcpkg install cryptopp:x64-windows  
+        vcpkg install luajit:x64-windows  
+        vcpkg install libmariadb:x64-windows  
+        vcpkg install pugixml:x64-windows  
+        vcpkg install mpir:x64-windows  
+      
+    - name: Build with MSBuild  
+      run: |  
+        msbuild vc14/theforgottenserver.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=x64  
+      
+    - name: Upload artifacts (EXE + DLLs)  
+      uses: actions/upload-artifact@v3  
+      with:  
+        name: theforgottenserver-${{ matrix.configuration }}-x64  
+        path: |  
+          vc14/**/*.exe  
+          vc14/**/*.dll
