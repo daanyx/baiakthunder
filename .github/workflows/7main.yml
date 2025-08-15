@@ -1,0 +1,84 @@
+name: XYZBuild Release x64 - Visual Studio v141  
+  
+on:  
+  push:  
+    branches: [ main, master ]  
+  pull_request:  
+    branches: [ main, master ]  
+  
+jobs:  
+  build:  
+    runs-on: windows-2022  
+      
+    steps:  
+    - name: Checkout code  
+      uses: actions/checkout@v4  
+      
+    - name: Setup MSBuild  
+      uses: microsoft/setup-msbuild@v2  
+      
+    - name: Cache vcpkg installed packages  
+      uses: actions/cache@v4  
+      with:  
+        path: C:\vcpkg\installed  
+        key: vcpkg-installed-v141-${{ runner.os }}-x64-${{ hashFiles('vc14/**/*.vcxproj', 'src/**/*.h', 'src/**/*.cpp') }}  
+        restore-keys: |  
+          vcpkg-installed-v141-${{ runner.os }}-x64-  
+          vcpkg-installed-v141-${{ runner.os }}-  
+      
+    - name: Setup vcpkg  
+      run: |  
+        git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
+        cd C:\vcpkg  
+        git checkout 2023.04.15  
+        .\bootstrap-vcpkg.bat  
+        .\vcpkg integrate install  
+      
+    - name: Install dependencies  
+      run: |  
+        C:\vcpkg\vcpkg install pugixml:x64-windows  
+        C:\vcpkg\vcpkg install fmt:x64-windows  
+        C:\vcpkg\vcpkg install boost-asio:x64-windows  
+        C:\vcpkg\vcpkg install boost-system:x64-windows  
+        C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
+        C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
+        C:\vcpkg\vcpkg install boost-variant:x64-windows  
+        C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
+        C:\vcpkg\vcpkg install cryptopp:x64-windows  
+        C:\vcpkg\vcpkg install luajit:x64-windows  
+        C:\vcpkg\vcpkg install libmariadb:x64-windows  
+        C:\vcpkg\vcpkg install mpir:x64-windows  
+      
+    - name: Update project for v141 toolset  
+      run: |  
+        # Atualizar Windows SDK  
+        (Get-Content vc14\theforgottenserver.vcxproj) -replace '10\.0\.16299\.0', '10.0' | Set-Content vc14\theforgottenserver.vcxproj  
+        Write-Host "✓ Windows SDK atualizado para versão 10.0"  
+      
+    - name: Build Release x64 with v141  
+      run: |  
+        Write-Host "Iniciando build Release x64 com PlatformToolset v141..."  
+        msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v141 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg /m  
+      
+    - name: Verify build output  
+      run: |  
+        if (Test-Path "vc14\x64\Release\theforgottenserver-x64.exe") {  
+          Write-Host "✓ Build bem-sucedido com v141!"  
+          $fileInfo = Get-Item "vc14\x64\Release\theforgottenserver-x64.exe"  
+          Write-Host "Tamanho: $($fileInfo.Length) bytes"  
+        } else {  
+          Write-Host "✗ Build falhou"  
+          exit 1  
+        }  
+      
+    - name: Collect artifacts  
+      run: |  
+        mkdir artifacts  
+        copy vc14\x64\Release\theforgottenserver-x64.exe artifacts\  
+        copy vc14\x64\Release\*.dll artifacts\ 2>$null || echo "Nenhuma DLL encontrada"  
+      
+    - name: Upload Release x64  
+      uses: actions/upload-artifact@v4  
+      with:  
+        name: baiak-thunder-release-x64-v141  
+        path: artifacts\*
