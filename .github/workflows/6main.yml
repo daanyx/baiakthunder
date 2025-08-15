@@ -30,7 +30,7 @@ jobs:
       uses: actions/cache@v4  
       with:  
         path: C:\vcpkg\downloads  
-        key: vcpkg-downloads-${{ runner.os }}-${{ hashFiles('**/vcpkg.json') }}  
+        key: vcpkg-downloads-${{ runner.os }}-${{ github.run_id }}  
         restore-keys: |  
           vcpkg-downloads-${{ runner.os }}-  
       
@@ -60,41 +60,83 @@ jobs:
         .\bootstrap-vcpkg.bat  
         .\vcpkg integrate install  
       
-- name: Install dependencies with forced rebuild  
-  run: |  
-    # Remover cache do Crypto++ e forçar recompilação  
-    C:\vcpkg\vcpkg remove cryptopp:x64-windows --recurse  
-    C:\vcpkg\vcpkg install cryptopp:x64-windows --no-binarycaching  
-      
-    # Instalar outras dependências normalmente  
-    C:\vcpkg\vcpkg install pugixml:x64-windows  
-    C:\vcpkg\vcpkg install fmt:x64-windows  
-    C:\vcpkg\vcpkg install boost-asio:x64-windows  
-    C:\vcpkg\vcpkg install boost-system:x64-windows  
-    C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
-    C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
-    C:\vcpkg\vcpkg install boost-variant:x64-windows  
-    C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
-    C:\vcpkg\vcpkg install luajit:x64-windows  
-    C:\vcpkg\vcpkg install libmariadb:x64-windows  
-    C:\vcpkg\vcpkg install mpir:x64-windows
+    - name: Install dependencies with Crypto++ rebuild  
+      run: |  
+        # Instalar dependências principais primeiro  
+        C:\vcpkg\vcpkg install pugixml:x64-windows  
+        C:\vcpkg\vcpkg install fmt:x64-windows  
+        C:\vcpkg\vcpkg install boost-asio:x64-windows  
+        C:\vcpkg\vcpkg install boost-system:x64-windows  
+        C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
+        C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
+        C:\vcpkg\vcpkg install boost-variant:x64-windows  
+        C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
+        C:\vcpkg\vcpkg install luajit:x64-windows  
+        C:\vcpkg\vcpkg install libmariadb:x64-windows  
+        C:\vcpkg\vcpkg install mpir:x64-windows  
+          
+        # Remover qualquer versão existente do Crypto++ e forçar recompilação  
+        C:\vcpkg\vcpkg remove cryptopp:x64-windows --recurse 2>$null || echo "Crypto++ não estava instalado"  
+        C:\vcpkg\vcpkg install cryptopp:x64-windows --no-binarycaching  
+          
+        # Verificar se todas as dependências críticas foram instaladas  
+        if (Test-Path "C:\vcpkg\installed\x64-windows\include\pugixml.hpp") {  
+          Write-Host "✓ PugiXML header encontrado"  
+        } else {  
+          Write-Host "✗ PugiXML header NÃO encontrado"  
+          exit 1  
+        }  
+          
+        if (Test-Path "C:\vcpkg\installed\x64-windows\include\cryptopp") {  
+          Write-Host "✓ Crypto++ headers encontrados"  
+        } else {  
+          Write-Host "✗ Crypto++ headers NÃO encontrados"  
+          exit 1  
+        }  
+          
+        if (Test-Path "C:\vcpkg\installed\x64-windows\include\fmt") {  
+          Write-Host "✓ fmt headers encontrados"  
+        } else {  
+          Write-Host "✗ fmt headers NÃO encontrados"  
+          exit 1  
+        }  
       
     - name: Update project for modern toolchain  
       run: |  
+        # Atualizar Windows SDK para versão disponível  
         (Get-Content vc14\theforgottenserver.vcxproj) -replace '10\.0\.16299\.0', '10.0' | Set-Content vc14\theforgottenserver.vcxproj  
+        Write-Host "✓ Windows SDK atualizado para versão 10.0"  
       
     - name: Build Release x64  
       run: |  
-        msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg /m  
+        Write-Host "Iniciando build Release x64..."  
+        msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0 /p:VcpkgRoot=C:\vcpkg /m /v:minimal  
+      
+    - name: Verify build output  
+      run: |  
+        if (Test-Path "vc14\x64\Release\theforgottenserver-x64.exe") {  
+          Write-Host "✓ Build bem-sucedido! Executável gerado."  
+          $fileInfo = Get-Item "vc14\x64\Release\theforgottenserver-x64.exe"  
+          Write-Host "Tamanho do executável: $($fileInfo.Length) bytes"  
+          Write-Host "Data de criação: $($fileInfo.CreationTime)"  
+        } else {  
+          Write-Host "✗ Build falhou - executável não encontrado"  
+          exit 1  
+        }  
       
     - name: Collect artifacts  
       run: |  
         mkdir artifacts  
         copy vc14\x64\Release\theforgottenserver-x64.exe artifacts\  
-        copy vc14\x64\Release\*.dll artifacts\ 2>$null || echo "No DLLs found"  
+        copy vc14\x64\Release\*.dll artifacts\ 2>$null || echo "Nenhuma DLL adicional encontrada"  
+        copy vc14\x64\Release\*.pdb artifacts\ 2>$null || echo "Nenhum arquivo PDB encontrado"  
+          
+        Write-Host "Artefatos coletados:"  
+        Get-ChildItem artifacts\ | ForEach-Object { Write-Host "- $($_.Name) ($($_.Length) bytes)" }  
       
-    - name: Upload artifacts  
+    - name: Upload Release x64  
       uses: actions/upload-artifact@v4  
       with:  
-        name: theforgottenserver-release-x64  
-        path: artifacts\*
+        name: baiak-thunder-release-x64  
+        path: artifacts\*  
+        retention-days: 30
