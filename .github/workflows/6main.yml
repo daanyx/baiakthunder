@@ -60,20 +60,24 @@ jobs:
         .\bootstrap-vcpkg.bat  
         .\vcpkg integrate install  
       
-    - name: Install dependencies  
-      run: |  
-        C:\vcpkg\vcpkg install pugixml:x64-windows  
-        C:\vcpkg\vcpkg install fmt:x64-windows  
-        C:\vcpkg\vcpkg install boost-asio:x64-windows  
-        C:\vcpkg\vcpkg install boost-system:x64-windows  
-        C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
-        C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
-        C:\vcpkg\vcpkg install boost-variant:x64-windows  
-        C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
-        C:\vcpkg\vcpkg install cryptopp:x64-windows  
-        C:\vcpkg\vcpkg install luajit:x64-windows  
-        C:\vcpkg\vcpkg install libmariadb:x64-windows  
-        C:\vcpkg\vcpkg install mpir:x64-windows  
+- name: Install dependencies with forced rebuild  
+  run: |  
+    # Remover cache do Crypto++ e forçar recompilação  
+    C:\vcpkg\vcpkg remove cryptopp:x64-windows --recurse  
+    C:\vcpkg\vcpkg install cryptopp:x64-windows --no-binarycaching  
+      
+    # Instalar outras dependências normalmente  
+    C:\vcpkg\vcpkg install pugixml:x64-windows  
+    C:\vcpkg\vcpkg install fmt:x64-windows  
+    C:\vcpkg\vcpkg install boost-asio:x64-windows  
+    C:\vcpkg\vcpkg install boost-system:x64-windows  
+    C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
+    C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
+    C:\vcpkg\vcpkg install boost-variant:x64-windows  
+    C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
+    C:\vcpkg\vcpkg install luajit:x64-windows  
+    C:\vcpkg\vcpkg install libmariadb:x64-windows  
+    C:\vcpkg\vcpkg install mpir:x64-windows
       
     - name: Update project for modern toolchain  
       run: |  
