@@ -1,4 +1,4 @@
-name: Build Windows x64  
+name: Build Release x64  
   
 on:  
   push:  
@@ -7,39 +7,76 @@ on:
     branches: [ main, master ]  
   
 jobs:  
-  build-windows:  
-    runs-on: windows-latest  
+  build:  
+    runs-on: windows-2019  
       
-    strategy:  
-      matrix:  
-        configuration: [Debug, Release]  
-          
     steps:  
-    - uses: actions/checkout@v3  
+    - name: Checkout code  
+      uses: actions/checkout@v3  
+      
+    - name: Setup MSBuild  
+      uses: microsoft/setup-msbuild@v1  
+      
+    - name: Cache vcpkg  
+      uses: actions/cache@v3  
+      with:  
+        path: C:\vcpkg\installed  
+        key: vcpkg-x64-windows-${{ hashFiles('**/appveyor.yml') }}  
+        restore-keys: |  
+          vcpkg-x64-windows-  
+      
+    - name: Cache vcpkg downloads  
+      uses: actions/cache@v3  
+      with:  
+        path: C:\vcpkg\downloads  
+        key: vcpkg-downloads-${{ hashFiles('**/appveyor.yml') }}  
+        restore-keys: |  
+          vcpkg-downloads-  
       
     - name: Setup vcpkg  
-      uses: microsoft/setup-msbuild@v1  
-        
-    - name: Install dependencies with vcpkg  
       run: |  
-        vcpkg install boost-iostreams:x64-windows  
-        vcpkg install boost-asio:x64-windows  
-        vcpkg install boost-system:x64-windows  
-        vcpkg install boost-filesystem:x64-windows  
-        vcpkg install boost-variant:x64-windows  
-        vcpkg install boost-lockfree:x64-windows  
-        vcpkg install cryptopp:x64-windows  
-        vcpkg install luajit:x64-windows  
-        vcpkg install libmariadb:x64-windows  
-        vcpkg install pugixml:x64-windows  
-        vcpkg install mpir:x64-windows  
+        if (!(Test-Path "C:\vcpkg")) {  
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg  
+          C:\vcpkg\bootstrap-vcpkg.bat  
+        }  
+        C:\vcpkg\vcpkg integrate install  
       
-    - name: Build with MSBuild  
+    - name: Install dependencies  
       run: |  
-        msbuild vc14/theforgottenserver.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=x64  
+        C:\vcpkg\vcpkg install boost-iostreams:x64-windows  
+        C:\vcpkg\vcpkg install boost-asio:x64-windows  
+        C:\vcpkg\vcpkg install boost-system:x64-windows  
+        C:\vcpkg\vcpkg install boost-filesystem:x64-windows  
+        C:\vcpkg\vcpkg install boost-variant:x64-windows  
+        C:\vcpkg\vcpkg install boost-lockfree:x64-windows  
+        C:\vcpkg\vcpkg install cryptopp:x64-windows  
+        C:\vcpkg\vcpkg install luajit:x64-windows  
+        C:\vcpkg\vcpkg install libmariadb:x64-windows  
+        C:\vcpkg\vcpkg install pugixml:x64-windows  
+        C:\vcpkg\vcpkg install mpir:x64-windows  
       
-    - name: Upload artifacts  
+    - name: Cache MSBuild  
+      uses: actions/cache@v3  
+      with:  
+        path: |  
+          vc14/x64/Release  
+          vc14/.vs  
+        key: msbuild-cache-${{ hashFiles('vc14/**/*.vcxproj', 'src/**/*.cpp', 'src/**/*.h') }}  
+        restore-keys: |  
+          msbuild-cache-  
+      
+    - name: Build Release x64  
+      run: |  
+        msbuild vc14\theforgottenserver.sln /p:Configuration=Release /p:Platform=x64 /p:VcpkgRoot=C:\vcpkg  
+      
+    - name: Collect artifacts  
+      run: |  
+        mkdir artifacts  
+        copy vc14\x64\Release\*.exe artifacts\  
+        copy vc14\x64\Release\*.dll artifacts\  
+      
+    - name: Upload Release x64  
       uses: actions/upload-artifact@v3  
       with:  
-        name: theforgottenserver-${{ matrix.configuration }}-x64  
-        path: vc14/**/*.exe
+        name: baiak-thunder-release-x64  
+        path: artifacts\*
